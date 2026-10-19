@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Сказка — парк, игровой прототип</title>
+<style>
+:root{color-scheme:dark;--panel:#132b35;--line:#36515a;--mint:#b8f2cf;--cream:#fff4d6}
+*{box-sizing:border-box}body{margin:0;background:#0b1b23;color:#f6f4e8;font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;background:#102630;border-bottom:1px solid var(--line);position:relative;z-index:2}
+.brand{font-weight:800;letter-spacing:.02em}.brand small{display:block;color:#9eb9bd;font-weight:500;font-size:12px}
+.controls{display:flex;gap:8px;flex-wrap:wrap}button{border:1px solid #54717a;background:#1b3b45;color:#fff4d6;border-radius:10px;padding:9px 12px;cursor:pointer;font:inherit}button:hover{background:#28515b}
+main{display:grid;grid-template-columns:minmax(0,1fr) 280px;min-height:calc(100vh - 64px)}#stage{position:relative;min-height:620px;overflow:hidden;background:#91c7b1;touch-action:none}canvas{width:100%;height:100%;position:absolute;inset:0;display:block}
+.hint{position:absolute;left:16px;bottom:16px;padding:9px 12px;border-radius:10px;background:#102630dc;color:#e6f4e8;font-size:12px;pointer-events:none}
+aside{padding:20px;background:#102630;border-left:1px solid var(--line)}h1{font-size:22px;margin:0 0 6px}p{color:#b8cbca;margin:0 0 18px}.status{border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0;background:#142f39}.status strong{display:block;color:var(--mint);font-size:13px;margin-bottom:4px}.statrow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #29434b}.statrow:last-child{border:0}.pill{display:inline-block;background:#294c46;color:#c6f5d5;border-radius:999px;padding:3px 8px;font-size:11px;margin-top:6px}
+footer{font-size:12px;color:#91a9ad;margin-top:18px}
+@media(max-width:800px){main{grid-template-columns:1fr}#stage{min-height:65vh}aside{border-left:0;border-top:1px solid var(--line)}header{align-items:flex-start;flex-direction:column}}
+</style></head>
+<body>
+<header><div class="brand">СКАЗКА <small>Игровой прототип · ранняя разработка</small></div><div class="controls"><button id="reset">Сбросить камеру</button><button id="toggle">⏸ Пауза</button><button id="day">☀ День / ночь</button></div></header>
+<main><section id="stage" aria-label="Игровая карта"><canvas id="world"></canvas><div class="hint">Перетаскивай карту мышью · колесо мыши — масштаб · на телефоне используй жесты</div></section>
+<aside><h1>Парк «Сказка»</h1><p>Отдельная тестовая площадка. Сейчас это интерактивный макет, а не точная географическая копия парка.</p>
+<div class="status"><strong>СЕЙЧАС В ПРОТОТИПЕ</strong><div class="statrow"><span>Изометрическая карта</span><span>✓</span></div><div class="statrow"><span>Приближение и панорама</span><span>✓</span></div><div class="statrow"><span>Анимация аттракционов</span><span>✓</span></div><div class="statrow"><span>Точная схема реального парка</span><span>В работе</span></div><div class="pill">Версия 0.1 · sandbox</div></div>
+<div class="status"><strong>АТТРАКЦИОНЫ</strong><div class="statrow"><span>Колесо обозрения</span><span>В движении</span></div><div class="statrow"><span>Карусель</span><span>В движении</span></div><div class="statrow"><span>Американские горки</span><span>В движении</span></div></div>
+<p>Дальше: уточнить расположение дорожек и объектов по реальным картам и фотографиям, затем добавлять посетителей и очереди.</p><footer>Макет создан для разработки. Положение объектов пока условное; это не официальная карта «Сказки».</footer></aside></main>
+<script>
+const canvas=document.querySelector('#world'),ctx=canvas.getContext('2d'),stage=document.querySelector('#stage');
+let w=0,h=0,scale=1,ox=0,oy=0,drag=false,lastX=0,lastY=0,paused=false,night=false,t=0;
+function resize(){const r=stage.getBoundingClientRect();w=canvas.width=Math.floor(r.width*devicePixelRatio);h=canvas.height=Math.floor(r.height*devicePixelRatio);canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';if(!ox){ox=w*.5;oy=h*.47}draw()}
+function iso(x,y,z=0){return [(x-y)*.866, (x+y)*.5-z]}
+function project(x,y,z=0){let p=iso(x,y,z);return [ox+p[0]*scale,oy+p[1]*scale]}
+function poly(points,fill,stroke){ctx.beginPath();points.forEach((p,i)=>{const q=project(...p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.2*devicePixelRatio;ctx.stroke()}}
+function line(points,color,width=3){ctx.beginPath();points.forEach((p,i)=>{const q=project(...p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.strokeStyle=color;ctx.lineWidth=width*devicePixelRatio;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke()}
+function ellipse(x,y,rx,ry,fill){let [a,b]=project(x,y);ctx.beginPath();ctx.ellipse(a,b,rx*scale,ry*scale,0,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill()}
+function tree(x,y,s=1){poly([[x-5*s,y,0],[x+5*s,y,0],[x+5*s,y,12*s],[x-5*s,y,12*s]],'#7b5841');let [a,b]=project(x,y,18*s);ctx.beginPath();ctx.arc(a,b,11*s*scale,0,Math.PI*2);ctx.fillStyle='#28734e';ctx.fill();ctx.beginPath();ctx.arc(a-4*s*scale,b-4*s*scale,6*s*scale,0,Math.PI*2);ctx.fillStyle='#4e9c68';ctx.fill()}
+function building(x,y,ww,dd,hh,color,label){poly([[x,y,0],[x+ww,y,0],[x+ww,y+dd,0],[x,y+dd,0]],color);poly([[x,y,0],[x+ww,y,0],[x+ww,y,hh],[x,y,hh]],'#e9bd7b');poly([[x+ww,y,0],[x+ww,y+dd,0],[x+ww,y+dd,hh],[x+ww,y,hh]],'#bd875b');poly([[x,y,hh],[x+ww,y,hh],[x+ww+8,y-6,hh+6],[x+8,y-6,hh+6]],'#bb5648');let p=project(x+ww/2,y+dd/2,hh+12);ctx.font=`bold ${Math.max(9,11*scale)}px system-ui`;ctx.textAlign='center';ctx.fillStyle='#17343a';ctx.fillText(label,p[0],p[1])}
+function ferris(x,y){ellipse(x,y,34,13,'#588c78');let [cx,cy]=project(x,y,62);let r=31*scale;ctx.strokeStyle='#eaf5e8';ctx.lineWidth=3*devicePixelRatio;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();for(let i=0;i<10;i++){let a=t*.6+i*Math.PI/5,xx=cx+Math.cos(a)*r,yy=cy+Math.sin(a)*r;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(xx,yy);ctx.strokeStyle='#f1e8c7';ctx.lineWidth=1.5*devicePixelRatio;ctx.stroke();ctx.beginPath();ctx.arc(xx,yy,4.3*scale,0,Math.PI*2);ctx.fillStyle=['#e66c5a','#e9c65d','#6ba9d0','#d987b6'][i%4];ctx.fill()}line([[x,y,0],[x,y,62]],'#e6e8d8',4)}
+function carousel(x,y){ellipse(x,y,29,11,'#51836e');let [cx,cy]=project(x,y,25);ctx.beginPath();ctx.ellipse(cx,cy,25*scale,10*scale,0,0,Math.PI*2);ctx.fillStyle='#f1cc67';ctx.fill();for(let i=0;i<8;i++){let a=t*1.7+i*Math.PI/4,xx=cx+Math.cos(a)*20*scale,yy=cy+Math.sin(a)*8*scale;ctx.beginPath();ctx.arc(xx,yy,4*scale,0,Math.PI*2);ctx.fillStyle=['#dc6555','#4c8ac1','#f3f0d9'][i%3];ctx.fill()}let p=project(x,y,37);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(cx,cy);ctx.strokeStyle='#e6e8d8';ctx.stroke()}
+function coaster(){const pts=[];for(let i=0;i<=36;i++){let u=i/36;pts.push([-145+u*240,-35+Math.sin(u*Math.PI*3)*24,20+Math.sin(u*Math.PI*2)*27])}line(pts,'#6b4c41',5);line(pts,'#f0c45e',2);let u=(t*.14)%1,p=pts[Math.floor(u*(pts.length-1))],q=project(...p);ctx.fillStyle='#e85f4f';ctx.fillRect(q[0]-5*scale,q[1]-3*scale,10*scale,6*scale);ctx.fillStyle='#ffdfad';ctx.fillRect(q[0]-3*scale,q[1]-5*scale,3*scale,2*scale)}
+function draw(){if(!ctx||!w)return;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=night?'#19384a':'#a7d9bd';ctx.fillRect(0,0,w,h);
+poly([[-270,-200,0],[270,-200,0],[270,200,0],[-270,200,0]],night?'#376a5b':'#73b982');
+for(let i=-4;i<=4;i++){line([[i*60,-200,0],[i*60,200,0]],night?'#41755e':'#83c58a',1);line([[-270,i*50,0],[270,i*50,0]],night?'#41755e':'#83c58a',1)}
+// Main walking paths
+poly([[-245,-15,1],[245,-15,1],[245,12,1],[-245,12,1]],'#e8d9b2');poly([[-22,-190,1],[6,-190,1],[6,190,1],[-22,190,1]],'#e8d9b2');
+poly([[-230,95,2],[230,95,2],[230,122,2],[-230,122,2]],'#e8d9b2');
+for(let i=0;i<16;i++){tree(-240+i*31,-155+(i%3)*7,.7+(i%2)*.2);tree(-238+i*31,157-(i%3)*7,.8)}
+building(-170,-112,45,30,27,'#d4a56b','КАФЕ');building(95,68,48,30,25,'#7eb4c5','КАССА');ferris(-85,-62);carousel(78,-66);coaster();building(130,-118,43,28,20,'#d98a67','ПАВИЛЬОН');
+// animated visitor dots on paths
+for(let i=0;i<18;i++){let u=(t*.025+i/18)%1,x=-210+u*420,y=(i%3===0?106:(i%3===1?0:-6));let [a,b]=project(x,y,2);ctx.beginPath();ctx.arc(a,b,2.5*devicePixelRatio,0,Math.PI*2);ctx.fillStyle=i%2?'#f7f0d4':'#e46d60';ctx.fill()}
+if(night){ctx.fillStyle='#08182a88';ctx.fillRect(0,0,w,h);for(const [x,y] of [[-170,-112],[95,68],[130,-118]]){let p=project(x,y,35);ctx.beginPath();ctx.arc(p[0],p[1],25*scale,0,Math.PI*2);ctx.fillStyle='#f4d77a22';ctx.fill()}}
+}
+function loop(){if(!paused)t+=1/60;draw();requestAnimationFrame(loop)}
+canvas.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag)return;ox+=(e.clientX-lastX)*devicePixelRatio;oy+=(e.clientY-lastY)*devicePixelRatio;lastX=e.clientX;lastY=e.clientY;draw()});canvas.addEventListener('pointerup',()=>drag=false);canvas.addEventListener('pointercancel',()=>drag=false);
+canvas.addEventListener('wheel',e=>{e.preventDefault();let f=e.deltaY<0?1.1:.9;scale=Math.max(.45,Math.min(2.4,scale*f));draw()},{passive:false});
+document.querySelector('#reset').onclick=()=>{scale=1;ox=w*.5;oy=h*.47;draw()};document.querySelector('#toggle').onclick=e=>{paused=!paused;e.target.textContent=paused?'▶ Продолжить':'⏸ Пауза'};document.querySelector('#day').onclick=()=>{night=!night;draw()};window.addEventListener('resize',resize);resize();loop();
+</script></body></html>
